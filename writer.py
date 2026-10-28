@@ -19,8 +19,20 @@ if hantei.lower() == "y":
         connection.connect()
         print("カードに接続しました")
         print("-----------------------------------------")
+        
         text_bytes = list(text.encode("utf-8"))
         print("UTF-8:", text_bytes)
+        language_code = list("ja".encode("ascii"))
+        status_byte = len(language_code)
+        payload = [status_byte] + language_code + text_bytes
+        print("ペイロード:", payload)
+
+        if len(payload) > 255:
+            print("入力された文字が長すぎます")
+            exit()
+        ndef_record = [0xD1, 0x01, len(payload), 0x54] + payload
+        print("NDEFレコード:", ndef_record)
+        
 
     except NoCardException:
         print("カードが接続されていません")
