@@ -3,6 +3,9 @@ from smartcard.Exceptions import NoCardException # カードが接続されて�
 
 # while True:
 reader_list = readers() # カードリーダーを検索 (デバイスに接続されている機械を探す)
+if not reader_list:
+    print("カードリーダーが接続されていません")
+    exit() # カードリーダーが接続されていない場合は終了
 reader = reader_list[0] 
 print("機械の名称：",reader)
 
