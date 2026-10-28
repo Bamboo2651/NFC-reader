@@ -34,7 +34,25 @@ if hantei.lower() == "y":
         print("NDEFレコード:", ndef_record)
         ndef_data = [0x03, len(ndef_record)] + ndef_record + [0xFE]
         print("カードへ書き込むデータ:", ndef_data)
+        start_page = 4
+        write_succeeded = True
 
+        for offset in range(0, len(ndef_data), 4):
+            page = start_page + offset // 4
+            page_data = ndef_data[offset:offset + 4]
+
+            write_command = [0xFF, 0xD6, 0x00, page, 0x04] + page_data
+            _, write_sw1, write_sw2 = connection.transmit(write_command)
+
+            if write_sw1 == 0x90 and write_sw2 == 0x00:
+                print(f"ページ{page}を書き込みました")
+            else:
+                print(f"ページ{page}の書き込みに失敗しました")
+                write_succeeded = False
+                break
+
+        if write_succeeded:
+            print("カードへの書き込みが完了しました")
         while len(ndef_data) % 4 != 0:
             ndef_data.append(0x00)
 
