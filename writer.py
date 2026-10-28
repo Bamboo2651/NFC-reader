@@ -19,6 +19,8 @@ if hantei.lower() == "y":
         connection.connect()
         print("カードに接続しました")
         print("-----------------------------------------")
+        text_bytes = list(text.encode("utf-8"))
+        print("UTF-8:", text_bytes)
 
     except NoCardException:
         print("カードが接続されていません")
