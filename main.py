@@ -1,92 +1,171 @@
-from smartcard.System import readers # カードリーダーを検索するためのモジュール
-from smartcard.Exceptions import NoCardException # カードが接続されていない場合の例外処理用
+import time
 
-# while True:
-reader_list = readers() # カードリーダーを検索 (デバイスに接続されている機械を探す)
-if not reader_list:
-    print("カードリーダーが接続されていません")
-    exit() # カードリーダーが接続されていない場合は終了
-reader = reader_list[0] 
-print("機械の名称：",reader)
-print("-----------------------------------------")
+from smartcard.Exceptions import CardConnectionException, NoCardException
+from smartcard.System import readers
 
-connection = reader.createConnection() # カードと通信するための接続準備
-try:
-    connection.connect() # RC-S300上のNFCカードへ接続
-    print("カードに接続しました")
-    print("-----------------------------------------")
 
-    get_uid_command = [0xFF, 0xCA, 0x00, 0x00, 0x00] #UIDを取得するためのコマンド
-    data, sw1, sw2 = connection.transmit(get_uid_command) # コマンドを送信してUIDを取得
+SEPARATOR = "=" * 50
 
-    if sw1 == 0x90 and sw2 == 0x00: # 正常にUIDが取得できた場合
-        box = []
-        for byte in data:
-            box.append(f"{byte:02X}")
-        uid = " ".join(box) # もし "-".join(box)ってやると、"01-02-03"みたいな感じで出力される
 
-        print("10進数UID:",data)
-        print("16進数UID:",uid)
-        print("10進数",sw1, sw2)
-        print("16進数",f"{sw1:02X}", f"{sw2:02X}")
-        print("-----------------------------------------")
+def clear_screen():
+    """ターミナルの表示を消して、左上へカーソルを戻す。"""
+    print("\033[2J\033[H", end="")
 
-        read_command = [0xFF, 0xB0, 0x00, 0x04, 0x10] # カードのデータを読み取るためのコマンド
-        card_data, card_sw1, card_sw2 = connection.transmit(read_command) # コマンドを送信してカードのデータを取得
 
-        print("カードのデータ:", card_data)
-        print("カード読み取り状態:", f"{card_sw1:02X}", f"{card_sw2:02X}")
-        if card_sw1 == 0x90 and card_sw2 == 0x00:
-            if card_data[0] == 0x03 and card_data[1] == 0x00:
-                print("カードにデータはありません")
-            else:
-                print("カードにデータが存在します")
-                print("データ長さ:", card_data[1], "バイト")
-                ndef_length = card_data[1]
-                total_length = 2 + ndef_length + 1
-                block_count = (total_length + 15) // 16
+def print_header(title):
+    print(SEPARATOR)
+    print(title)
+    print(SEPARATOR)
 
-                print("NDEFレコード長:", ndef_length, "バイト")
-                print("必要な読み取り回数:", block_count, "回")
 
-                all_data = []
-                read_failed = False
+def show_waiting_screen(reader_name):
+    clear_screen()
+    print_header("NFCカードリーダー")
+    print("\n状態: 待機中")
+    print("使用機器:", reader_name)
+    print("\nカードをかざしてください")
+    print("終了: Ctrl+C")
 
-                for block_index in range(block_count):
-                    start_page = 4 + block_index * 4
-                    read_command = [0xFF, 0xB0, 0x00, start_page, 0x10]
 
-                    block_data, block_sw1, block_sw2 = connection.transmit(read_command)
+def show_reader_missing_screen():
+    clear_screen()
+    print_header("NFCカードリーダー")
+    print("\n状態: リーダー未接続")
+    print("\nRC-S300をPCへ接続してください")
+    print("終了: Ctrl+C")
 
-                    if block_sw1 != 0x90 or block_sw2 != 0x00:
-                        print(f"ページ{start_page}からの読み取りに失敗しました")
-                        read_failed = True
-                        break
 
-                    all_data.extend(block_data)
+def read_card(connection):
+    """接続済みのNFCカードからUIDとNDEFテキストを読み取る。"""
+    get_uid_command = [0xFF, 0xCA, 0x00, 0x00, 0x00]
+    uid_data, uid_sw1, uid_sw2 = connection.transmit(get_uid_command)
 
-                if not read_failed:
-                    ndef_record = all_data[2:2 + ndef_length]
-                    print("NDEFレコード全体:", ndef_record)
+    if uid_sw1 != 0x90 or uid_sw2 != 0x00:
+        print("UIDの取得に失敗しました")
+        return
 
-                    if ndef_record[3] == 0x54:
-                        payload_length = ndef_record[2]
-                        status_byte = ndef_record[4]
-                        language_length = status_byte & 0x3F
+    uid = " ".join(f"{byte:02X}" for byte in uid_data)
+    print("\n[カード情報]")
+    print("UID:", uid)
 
-                        text_start = 5 + language_length
-                        text_end = 4 + payload_length
-                        text_bytes = bytes(ndef_record[text_start:text_end])
+    first_read_command = [0xFF, 0xB0, 0x00, 0x04, 0x10]
+    card_data, card_sw1, card_sw2 = connection.transmit(first_read_command)
 
-                        decoded_text = text_bytes.decode("utf-8")
-                        print("カードに保存された文字:", decoded_text)
-                    else:
-                        print("テキスト形式ではないNDEFデータです")
+    if card_sw1 != 0x90 or card_sw2 != 0x00:
+        print("カードのデータを読み取れませんでした")
+        return
 
-        else:
-            print("カードのデータを読み取れませんでした")
-    else:
-        print("UID取得に失敗しました")
+    print("\n[NDEFデータ]")
 
-except NoCardException:
-    print("カードが接続されていません")
+    if len(card_data) < 2 or card_data[0] != 0x03:
+        print("NDEF形式のデータではありません")
+        return
+
+    ndef_length = card_data[1]
+    if ndef_length == 0:
+        print("カードにNDEFデータは保存されていません")
+        return
+
+    total_length = 2 + ndef_length + 1
+    block_count = (total_length + 15) // 16
+    all_data = []
+
+    for block_index in range(block_count):
+        start_page = 4 + block_index * 4
+        read_command = [0xFF, 0xB0, 0x00, start_page, 0x10]
+        block_data, block_sw1, block_sw2 = connection.transmit(read_command)
+
+        if block_sw1 != 0x90 or block_sw2 != 0x00:
+            print(f"ページ{start_page}からの読み取りに失敗しました")
+            return
+
+        all_data.extend(block_data)
+
+    ndef_record = all_data[2:2 + ndef_length]
+    if len(ndef_record) < 5 or ndef_record[3] != 0x54:
+        print("テキスト形式ではないNDEFデータです")
+        return
+
+    payload_length = ndef_record[2]
+    status_byte = ndef_record[4]
+    language_length = status_byte & 0x3F
+    text_start = 5 + language_length
+    text_end = 4 + payload_length
+    text_bytes = bytes(ndef_record[text_start:text_end])
+
+    try:
+        decoded_text = text_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        print("保存された文字をUTF-8として読み取れませんでした")
+        return
+
+    print("種類: テキスト")
+    print("データ長:", ndef_length, "バイト")
+    print("内容:", decoded_text)
+
+
+def main():
+    current_reader_name = None
+    reader_missing_announced = False
+
+    try:
+        while True:
+            reader_list = readers()
+
+            if not reader_list:
+                if not reader_missing_announced:
+                    show_reader_missing_screen()
+                    reader_missing_announced = True
+                current_reader_name = None
+                time.sleep(1)
+                continue
+
+            reader_missing_announced = False
+            reader = reader_list[0]
+            reader_name = str(reader)
+
+            if reader_name != current_reader_name:
+                show_waiting_screen(reader_name)
+                current_reader_name = reader_name
+
+            connection = reader.createConnection()
+            connected = False
+
+            try:
+                connection.connect()
+                connected = True
+
+                clear_screen()
+                print_header("NFCカード読み取り結果")
+                print("\n状態: 読み取り完了")
+                print("使用機器:", reader_name)
+                read_card(connection)
+                print("\n" + SEPARATOR)
+                print("カードを離してください")
+                print("終了: Ctrl+C")
+
+                # 同じカードを何度も読まないよう、離されるまで待つ。
+                while True:
+                    time.sleep(0.3)
+                    connection.transmit([0xFF, 0xCA, 0x00, 0x00, 0x00])
+
+            except (NoCardException, CardConnectionException):
+                # 読み取り後にカードが離されたときだけ、待機画面へ戻す。
+                if connected:
+                    show_waiting_screen(reader_name)
+
+            finally:
+                if connected:
+                    try:
+                        connection.disconnect()
+                    except CardConnectionException:
+                        pass
+
+            time.sleep(0.4)
+
+    except KeyboardInterrupt:
+        print("\n読み取りを終了しました")
+
+
+if __name__ == "__main__":
+    main()
