@@ -1,4 +1,5 @@
-from smartcard.System import readers
+from smartcard.System import readers # カードリーダーを検索するためのモジュール
+from smartcard.Exceptions import NoCardException # カードが接続されていない場合の例外処理用
 
 # while True:
 reader_list = readers() # カードリーダーを検索 (デバイスに接続されている機械を探す)
