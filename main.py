@@ -36,8 +36,14 @@ try:
 
         print("カードのデータ:", card_data)
         print("カード読み取り状態:", f"{card_sw1:02X}", f"{card_sw2:02X}")
-        if card_data[0] == 0x03 and card_data[1] == 0x00:
-            print("カードにデータはありません")
+        if card_sw1 == 0x90 and card_sw2 == 0x00:
+            if card_data[0] == 0x03 and card_data[1] == 0x00:
+                print("カードにデータはありません")
+            else:
+                print("カードにデータが存在します")
+                print("データ長さ:", card_data[1], "バイト")
+        else:
+            print("カードのデータを読み取れませんでした")
     else:
         print("UID取得に失敗しました")
 
