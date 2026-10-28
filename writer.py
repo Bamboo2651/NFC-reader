@@ -34,7 +34,12 @@ if hantei.lower() == "y":
         print("NDEFレコード:", ndef_record)
         ndef_data = [0x03, len(ndef_record)] + ndef_record + [0xFE]
         print("カードへ書き込むデータ:", ndef_data)
-        
+
+        while len(ndef_data) % 4 != 0:
+            ndef_data.append(0x00)
+
+        print("4バイト単位へ調整後:", ndef_data)
+        print("書き込むページ数:", len(ndef_data) // 4)
 
     except NoCardException:
         print("カードが接続されていません")
