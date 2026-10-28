@@ -48,6 +48,27 @@ try:
 
                 print("NDEFレコード長:", ndef_length, "バイト")
                 print("必要な読み取り回数:", block_count, "回")
+
+                all_data = []
+                read_failed = False
+
+                for block_index in range(block_count):
+                    start_page = 4 + block_index * 4
+                    read_command = [0xFF, 0xB0, 0x00, start_page, 0x10]
+
+                    block_data, block_sw1, block_sw2 = connection.transmit(read_command)
+
+                    if block_sw1 != 0x90 or block_sw2 != 0x00:
+                        print(f"ページ{start_page}からの読み取りに失敗しました")
+                        read_failed = True
+                        break
+
+                    all_data.extend(block_data)
+
+                if not read_failed:
+                    ndef_record = all_data[2:2 + ndef_length]
+                    print("NDEFレコード全体:", ndef_record)
+
         else:
             print("カードのデータを読み取れませんでした")
     else:
