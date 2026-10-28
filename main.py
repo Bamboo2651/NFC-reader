@@ -42,6 +42,12 @@ try:
             else:
                 print("カードにデータが存在します")
                 print("データ長さ:", card_data[1], "バイト")
+                ndef_length = card_data[1]
+                total_length = 2 + ndef_length + 1
+                block_count = (total_length + 15) // 16
+
+                print("NDEFレコード長:", ndef_length, "バイト")
+                print("必要な読み取り回数:", block_count, "回")
         else:
             print("カードのデータを読み取れませんでした")
     else:
