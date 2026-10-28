@@ -1,6 +1,5 @@
 from smartcard.System import readers
 from smartcard.Exceptions import NoCardException
-from writer import write_to_card
 
 text = input("入力：")
 print("入力された文字列:", text)
