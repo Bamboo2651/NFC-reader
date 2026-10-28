@@ -27,11 +27,13 @@ if hantei.lower() == "y":
         payload = [status_byte] + language_code + text_bytes
         print("ペイロード:", payload)
 
-        if len(payload) > 255:
+        if len(payload) > 250:
             print("入力された文字が長すぎます")
             exit()
         ndef_record = [0xD1, 0x01, len(payload), 0x54] + payload
         print("NDEFレコード:", ndef_record)
+        ndef_data = [0x03, len(ndef_record)] + ndef_record + [0xFE]
+        print("カードへ書き込むデータ:", ndef_data)
         
 
     except NoCardException:
