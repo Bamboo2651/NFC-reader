@@ -69,6 +69,20 @@ try:
                     ndef_record = all_data[2:2 + ndef_length]
                     print("NDEFレコード全体:", ndef_record)
 
+                    if ndef_record[3] == 0x54:
+                        payload_length = ndef_record[2]
+                        status_byte = ndef_record[4]
+                        language_length = status_byte & 0x3F
+
+                        text_start = 5 + language_length
+                        text_end = 4 + payload_length
+                        text_bytes = bytes(ndef_record[text_start:text_end])
+
+                        decoded_text = text_bytes.decode("utf-8")
+                        print("カードに保存された文字:", decoded_text)
+                    else:
+                        print("テキスト形式ではないNDEFデータです")
+
         else:
             print("カードのデータを読み取れませんでした")
     else:
